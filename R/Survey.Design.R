@@ -278,3 +278,109 @@ setMethod(
 )
 
 
+#' summary
+#'
+#' Summarises S4 object of class 'Survey.Design'
+#'
+#' @param object an object which inherits from the Survey.Design class
+#' @rdname summary.Survey.Design-methods
+#' @exportMethod summary
+setMethod(
+  f="summary",
+  signature="Survey.Design",
+  definition=function(object){
+    strata.names <- object@region@strata.name
+    for(strat in seq(along = strata.names)){
+      title <- paste("\n   Strata ", strata.names[strat], ":", sep = "")
+      len.title <- nchar(title)
+      underline <- paste("   ", paste(rep("_", (len.title-3)), collapse = ""), sep = "")
+      cat(title, fill = T)
+      cat(underline, fill = T)
+      design <- switch(object@design[strat],
+                       "random" = "randomly located transects",
+                       "systematic" = "systematically spaced transects",
+                       "eszigzag" = "equal spaced zigzag",
+                       "eszigzagcom" = "complementaty equal spaced zigzags",
+                       "segmentedgrid" = "segmented grid")
+      cat("Design: ", design, fill = T)
+      if(object@design[strat] %in% c("systematic", "eszigzag", "eszigzagcom", "segmentedgrid")){
+        cat("Spacing: ", object@spacing[strat], fill = T)
+      }
+      if(length(object@samplers) == 1){
+        cat("Number of samplers: ", object@samplers, " (shared across strata)", fill = T)
+      }else{
+        cat("Number of samplers: ", object@samplers[strat], fill = T)
+      }
+      line.length <- try(object@line.length, silent = TRUE)
+      if(class(line.length) != "try-error"){
+        if(length(line.length) == 1){
+          cat("Line length: ", line.length, " (shared across strata)", fill = T)
+        }else if(length(line.length) == length(strata.names)){
+          cat("Line length: ", line.length[strat], fill = T)
+        }else{
+          cat("Line length: NA", fill = T)
+        }
+      }
+      if(object@design[strat] %in% c("segmentedgrid")){
+        cat("Segment length: ", object@seg.length[strat], fill = T)
+        cat("Segment threshold: ", object@seg.threshold[strat], fill = T)
+      }
+      cat("Design angle: ", object@design.angle[strat], fill = T)
+      cat("Edge protocol: ", object@edge.protocol[strat], fill = T)
+    }
+    dp <- ifelse(any(object@region@area < 10), 3, 0)
+    cat("\nStrata areas: ", paste(round(object@region@area, dp), collapse = ", "), fill = T)
+    if(length(object@region@units) > 0){
+      if(class(line.length) != "try-error"){
+        cat("Region and effort units: ", object@region@units, fill = T)
+      }else{
+        cat("Region units: ", object@region@units, fill = T)
+      }
+    }
+    if(length(object@effort.allocation) > 0){
+      cat("Effort allocation across strata: ", paste(object@effort.allocation*100, collapse = "%, "), "%", sep = "", fill = T)
+    }
+    if(length(object@coverage.scores) > 0){
+      cat("Coverage Simulation repetitions: ", object@coverage.reps, fill = T)
+    }
+
+    design.stats <- object@design.statistics
+    names.stats <- names(design.stats)
+    for(i in seq(along = design.stats)){
+      title <- switch(names.stats[i],
+                      "sampler.count" = "Number of samplers:",
+                      "cov.area" = "Covered area:",
+                      "p.cov.area" = "% of region covered:",
+                      "line.length" = "Line length:",
+                      "trackline" = "Trackline length:",
+                      "cyclictrackline" = "Cyclic trackline length:")
+      cat("\n   ", title, fill = T)
+      underline <- paste(rep("", (nchar(title)-3)), collapse = "")
+      cat("   ", underline, fill = T)
+      print(design.stats[[i]])
+    }
+    if(!all(is.na(object@coverage.scores))){
+      title <- "Coverage Score Summary:"
+      cat("\n   ", title, fill = T)
+      underline <- paste(rep("", (nchar(title)-3)), collapse = "")
+      cat("   ", underline, fill = T)
+      cov.scores <- array(NA, dim = c(5, (length(strata.names)+1)), dimnames = list(c("Minimum", "Mean", "Median", "Maximum", "sd"), c(strata.names, "Total")))
+      for(i in seq(along = strata.names)){
+        cov.strat <- get.coverage(object, i)
+        cov.scores["Minimum",i] <- min(cov.strat, na.rm = T)
+        cov.scores["Mean",i] <- mean(cov.strat, na.rm = T)
+        cov.scores["Median",i] <- median(cov.strat, na.rm = T)
+        cov.scores["Maximum",i] <- max(cov.strat, na.rm = T)
+        cov.scores["sd",i] <- sd(cov.strat, na.rm = T)
+      }
+      #Add in total column
+      cov.scores["Minimum","Total"] <- min(object@coverage.scores, na.rm = T)
+      cov.scores["Mean","Total"] <- mean(object@coverage.scores, na.rm = T)
+      cov.scores["Median","Total"] <- median(object@coverage.scores, na.rm = T)
+      cov.scores["Maximum","Total"] <- max(object@coverage.scores, na.rm = T)
+      cov.scores["sd","Total"] <- sd(object@coverage.scores, na.rm = T)
+      print(cov.scores)
+    }
+  }
+)
+
